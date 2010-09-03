@@ -11,7 +11,10 @@ class RemoteTnsTest < Test::Unit::TestCase
       file.puts(@order_id.to_i + 1)
     end
     
-    @gateway = TnsGateway.new(fixtures(:tns))
+    @gateway = TnsGateway.new(fixtures(:tns_auth_capture1))
+    @gateway_auth_capture2 = TnsGateway.new(fixtures(:tns_auth_capture2))
+    @gateway_purchase = TnsGateway.new(fixtures(:tns_purchase1))
+    @gateway_purchase2 = TnsGateway.new(fixtures(:tns_auth_capture2))
 
     @amount                                      = 12000
     @unprocessable_transaction_amount            = 12010
@@ -21,17 +24,26 @@ class RemoteTnsTest < Test::Unit::TestCase
     @expired_amount                              = 12054
     @insufficient_credit_amount                  = 12051
 
-    @visa_card = credit_card('4987654321098769', :month => 5, :year => 13)
-    @invalid_visa_card = credit_card('4111111111111111', :month => 5, :year => 13)
-    @visa_card_without_cvv = credit_card('4987654321098769', :month => 5, :year => 13, :verification_value => nil)
-    @visa_card_with_invalid_cvv_code = credit_card('4987654321098769', :month => 5, :year => 13, :verification_value => 104)
-    @visa_card_with_unregistered_cvv_code = credit_card('4987654321098769', :month => 5, :year => 13, :verification_value => 103)
-    @visa_card_with_unprocessed_cvv_code = credit_card('4987654321098769', :month => 5, :year => 13, :verification_value => 102)
+    @visa_card                            = credit_card('4987654321098769', :month => 5, :year => 13)
+    @invalid_visa_card                    = credit_card('4111111111111111', :month => 5, :year => 13)
+    @visa_card_without_cvv                = credit_card('4987654321098769', :month => 5, :year => 13,
+                                                        :verification_value => nil)
+
+    @visa_card_with_invalid_cvv_code      = credit_card('4987654321098769', :month => 5, :year => 13,
+                                                        :verification_value => 104)
+
+    @visa_card_with_unregistered_cvv_code = credit_card('4987654321098769', :month => 5, :year => 13,
+                                                        :verification_value => 103)
+
+    @visa_card_with_unprocessed_cvv_code  = credit_card('4987654321098769', :month => 5, :year => 13,
+                                                        :verification_value => 102)
     
     @options = { 
+      :ip_address => '10.10.10.10',
       :order_id => @order_id,
       :billing_address => address,
-      :description => 'Store Purchase'
+      :description => 'Store Purchase',
+      :vpc_MerchTxnRef => '1234'
     }
   end
 
@@ -63,12 +75,18 @@ class RemoteTnsTest < Test::Unit::TestCase
     assert_equal 'Transaction Approved', response.message
   end
 
+  def test_authorize_with_multiple_merchants
+    assert response = @gateway_auth_capture2.authorize(@amount, @visa_card, @options)
+    assert_success response
+    assert_equal 'Transaction Approved', response.message
+  end
+
   # this should fail, for some reason it succeeds
-  # def test_authorize_fails_without_cvv
-  #   assert response = @gateway.authorize(@amount, @visa_card_without_cvv, @options)
-  #   assert_success response
-  #   assert_equal 'Transaction Approved', response.message
-  # end
+  def test_authorize_fails_without_cvv
+    assert response = @gateway.authorize(@amount, @visa_card_without_cvv, @options)
+    assert_failure response
+    assert_equal "Parameter 'card.securityCode' is required. value: null - reason: No CSC value was provided", response.message
+  end
 
   def test_authorize_fails_with_invalid_cvv_code
     assert response = @gateway.authorize(@amount, @visa_card_with_invalid_cvv_code, @options)
@@ -87,16 +105,18 @@ class RemoteTnsTest < Test::Unit::TestCase
     assert_failure response
     assert_equal 'Transaction blocked due to Risk or 3D Secure blocking rules', response.message
   end
-  
-  def test_authorize_must_have_unique_id
-    assert response = @gateway.authorize(@amount, @visa_card, @options)
-    assert_success response
-    assert_equal 'Transaction Approved', response.message
 
-    assert response = @gateway.authorize(@amount, @visa_card, @options)
-    assert_failure response
-    assert_equal 'Transaction or Order ID supplied already exists, but the transaction parameters do not match. To retry a transaction, the parameters must be the same. For new transactions, order.id must be unique and transaction.id must be unique for the order.', response.message
-  end
+  # FIXME: this still fails intermittently when an Auth is returned
+  # with a pending state by mistake. Speak to TNS to get this fixed
+  # def test_authorize_must_have_unique_id
+  #   assert response = @gateway.authorize(@amount, @visa_card, @options)
+  #   assert_success response
+  #   assert_equal 'Transaction Approved', response.message
+
+  #   assert response = @gateway.authorize(@amount, @visa_card, @options)
+  #   assert_failure response
+  #   assert_equal 'Transaction or Order ID supplied already exists, but the transaction parameters do not match. To retry a transaction, the parameters must be the same. For new transactions, order.id must be unique and transaction.id must be unique for the order.', response.message
+  # end
 
   def test_authorize_with_invalid_credit_card
     assert response = @gateway.authorize(@amount, @invalid_visa_card, @options)

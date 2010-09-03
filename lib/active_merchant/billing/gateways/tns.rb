@@ -94,7 +94,7 @@ module ActiveMerchant #:nodoc:
         add_invoice(post, options)
         add_creditcard(post, creditcard)
         # add_address(post, creditcard, options)        
-        # add_customer_data(post, options)
+        add_customer_data(post, options)
 
        commit('AUTHORIZE', money, post)
       end
@@ -116,13 +116,18 @@ module ActiveMerchant #:nodoc:
       private                       
       
       def add_customer_data(post, options)
+        post['customer.ipAddress'] = options[:ip_address]
       end
 
       def add_address(post, creditcard, options)      
       end
 
       def add_invoice(post, options)
+        # The unique identifier of the order, to distinguish it from any other order you ever issue
         post['order.id'] = options[:order_id]
+
+        # The unique identifier of the transaction, to distinguish it from other transactions on the order
+        post['transaction.id'] = options[:vpc_MerchTxnRef]
       end
       
       def add_creditcard(post, creditcard)
@@ -139,7 +144,6 @@ module ActiveMerchant #:nodoc:
         parameters[:apiOperation] = action
         parameters['transaction.amount'] = amount(money)
         parameters['transaction.currency'] = self.default_currency
-        parameters['transaction.id'] = rand(1234)
 
         puts "\nXXXXXXXXXXXXXXXX", "COMMITTING POST DATA: #{post_data(parameters)} length: #{post_data(parameters).length}"        , "XXXXXXXXXXXXXXXX\n\n"
         
