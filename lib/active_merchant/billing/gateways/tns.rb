@@ -169,12 +169,14 @@ module ActiveMerchant #:nodoc:
       end      
       
       def message_from(response)
-        puts "response: #{response.inspect}"
+        puts "RESPONSE: #{response.inspect}"
         if response["result"] == "ERROR"
-          return CGI.unescape(response["explanation"] || response["supportCode"])
+          response_message = CGI.unescape(response["explanation"] || response["supportCode"])
         else
-          return RESPONSE_GATEWAY_CODES[response["response.gatewayCode"]]          
+          response_message = RESPONSE_GATEWAY_CODES[response["response.gatewayCode"]]          
         end
+        puts "RESPONSE_MESSAGE: #{response_message.inspect}"
+        return response_message
       end
       
       def post_data(parameters = {})

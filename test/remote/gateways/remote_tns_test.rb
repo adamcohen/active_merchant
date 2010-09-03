@@ -4,6 +4,13 @@ require 'test_helper'
 class RemoteTnsTest < Test::Unit::TestCase
 
   def setup
+    # each order number has to be unique
+    File.open("tns_last_used_order_id.txt", File::RDWR|File::CREAT) do |file|
+      @order_id = file.read.chomp
+      file.rewind
+      file.puts(@order_id.to_i + 1)
+    end
+    
     @gateway = TnsGateway.new(fixtures(:tns))
 
     @amount                                      = 12000
@@ -17,9 +24,12 @@ class RemoteTnsTest < Test::Unit::TestCase
     @visa_card = credit_card('4987654321098769', :month => 5, :year => 13)
     @invalid_visa_card = credit_card('4111111111111111', :month => 5, :year => 13)
     @visa_card_without_cvv = credit_card('4987654321098769', :month => 5, :year => 13, :verification_value => nil)
+    @visa_card_with_invalid_cvv_code = credit_card('4987654321098769', :month => 5, :year => 13, :verification_value => 104)
+    @visa_card_with_unregistered_cvv_code = credit_card('4987654321098769', :month => 5, :year => 13, :verification_value => 103)
+    @visa_card_with_unprocessed_cvv_code = credit_card('4987654321098769', :month => 5, :year => 13, :verification_value => 102)
     
     @options = { 
-      :order_id => rand(9999) + 10000000000,
+      :order_id => @order_id,
       :billing_address => address,
       :description => 'Store Purchase'
     }
@@ -51,6 +61,41 @@ class RemoteTnsTest < Test::Unit::TestCase
     assert response = @gateway.authorize(@amount, @visa_card, @options)
     assert_success response
     assert_equal 'Transaction Approved', response.message
+  end
+
+  # this should fail, for some reason it succeeds
+  # def test_authorize_fails_without_cvv
+  #   assert response = @gateway.authorize(@amount, @visa_card_without_cvv, @options)
+  #   assert_success response
+  #   assert_equal 'Transaction Approved', response.message
+  # end
+
+  def test_authorize_fails_with_invalid_cvv_code
+    assert response = @gateway.authorize(@amount, @visa_card_with_invalid_cvv_code, @options)
+    assert_failure response
+    assert_equal 'Transaction blocked due to Risk or 3D Secure blocking rules', response.message
+  end
+
+  def test_authorize_fails_with_unprocessed_cvv_code
+    assert response = @gateway.authorize(@amount, @visa_card_with_unprocessed_cvv_code, @options)
+    assert_failure response
+    assert_equal 'Transaction blocked due to Risk or 3D Secure blocking rules', response.message
+  end
+
+  def test_authorize_fails_with_unregistered_cvv_code
+    assert response = @gateway.authorize(@amount, @visa_card_with_unregistered_cvv_code, @options)
+    assert_failure response
+    assert_equal 'Transaction blocked due to Risk or 3D Secure blocking rules', response.message
+  end
+  
+  def test_authorize_must_have_unique_id
+    assert response = @gateway.authorize(@amount, @visa_card, @options)
+    assert_success response
+    assert_equal 'Transaction Approved', response.message
+
+    assert response = @gateway.authorize(@amount, @visa_card, @options)
+    assert_failure response
+    assert_equal 'Transaction or Order ID supplied already exists, but the transaction parameters do not match. To retry a transaction, the parameters must be the same. For new transactions, order.id must be unique and transaction.id must be unique for the order.', response.message
   end
 
   def test_authorize_with_invalid_credit_card
