@@ -156,7 +156,7 @@ module ActiveMerchant #:nodoc:
         Response.new(success, message, data, 
           :test => Base.test?, 
           :authorization => data["transaction.receipt"],
-          :cvv_result => data["cvv"],
+          :cvv_result => data["response.cardSecurityCode.acquirerCode"],
           :avs_result => { :code => data["avs"] }
         )
       end

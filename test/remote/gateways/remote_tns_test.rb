@@ -81,7 +81,6 @@ class RemoteTnsTest < Test::Unit::TestCase
     assert_equal 'Transaction Approved', response.message
   end
 
-  # this should fail, for some reason it succeeds
   def test_authorize_fails_without_cvv
     assert response = @gateway.authorize(@amount, @visa_card_without_cvv, @options)
     assert_failure response
@@ -106,8 +105,8 @@ class RemoteTnsTest < Test::Unit::TestCase
     assert_equal 'Transaction blocked due to Risk or 3D Secure blocking rules', response.message
   end
 
-  # FIXME: this still fails intermittently when an Auth is returned
-  # with a pending state by mistake. Speak to TNS to get this fixed
+  # FIXME: for some reason this allows duplicate transactions to be
+  # authorized with the same transaction id
   # def test_authorize_must_have_unique_id
   #   assert response = @gateway.authorize(@amount, @visa_card, @options)
   #   assert_success response
@@ -136,11 +135,13 @@ class RemoteTnsTest < Test::Unit::TestCase
     assert_equal "Transaction declined due to insufficient funds", response.message
   end
 
-  def test_authorize_with_response_timeout
-    assert response = @gateway.authorize(@response_timeout_amount, @visa_card, @options)
-    assert_failure response
-    assert_equal "Response timed out", response.message
-  end
+  # the following test will cause all subsequent Auths to return the
+  # Pending state, disable for now
+  # def test_authorize_with_response_timeout
+  #   assert response = @gateway.authorize(@response_timeout_amount, @visa_card, @options)
+  #   assert_failure response
+  #   assert_equal "Response timed out", response.message
+  # end
 
   # can't test the following two assertions - sometimes they get
   # failures, sometimes they get pending results
@@ -162,15 +163,15 @@ class RemoteTnsTest < Test::Unit::TestCase
     assert_equal "Transaction declined by issuer", response.message
   end  
   
-  # def test_authorize_and_capture
-  #   amount = @amount
-  #   assert auth = @gateway.authorize(amount, @credit_card, @options)
-  #   assert_success auth
-  #   assert_equal 'Success', auth.message
-  #   assert auth.authorization
-  #   assert capture = @gateway.capture(amount, auth.authorization)
-  #   assert_success capture
-  # end
+  def test_authorize_and_capture
+    amount = @amount
+    assert response = @gateway.authorize(amount, @visa_card, @options)
+    assert_success response
+    assert_equal 'Transaction Approved', response.message
+    assert response.authorization
+    # assert capture = @gateway.capture(amount, auth.authorization)
+    # assert_success capture
+  end
 
   # def test_failed_capture
   #   assert response = @gateway.capture(@amount, '')
