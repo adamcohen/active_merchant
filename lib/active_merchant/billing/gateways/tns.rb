@@ -1,11 +1,11 @@
+# -*- coding: utf-8 -*-
 module ActiveMerchant #:nodoc:
   module Billing #:nodoc:
     class TnsGateway < Gateway
-      TEST_URL = 'https://staging.uat.dialectpayments.com/api/nvp/version/1'
-      LIVE_URL = 'https://staging.uat.dialectpayments.com/api/nvp/version/1'
-      LOCALHOST_URL = 'http://localhost/api/nvp/version/1'
-      URL = TEST_URL
-      # URL = LOCALHOST_URL
+      class_inheritable_accessor :test_url, :live_url, :arb_test_url, :arb_live_url
+
+      self.test_url = 'https://staging.uat.dialectpayments.com/api/nvp/version/1'
+      self.live_url = 'https://dialectpayments.com/api/nvp/version/1'
 
       # possible result codes
       # SUCCESS The transaction was successfully processed
@@ -70,6 +70,11 @@ module ActiveMerchant #:nodoc:
 
       self.default_currency = 'AUD'
 
+      # There are two different styles for formatting amounts in use:
+      # * :dollars – The amount is formatted as a float dollar amount with two decimal places (Default)
+      # * :cents – The amount is formatted as an integer value in cents
+      # self.money_format = :cents
+      
       # The card types supported by the payment gateway
       self.supported_cardtypes = [:visa, :master, :american_express, :diners_club]
       
@@ -80,7 +85,7 @@ module ActiveMerchant #:nodoc:
       self.display_name = 'Transaction Network Services'
       
       def initialize(options = {})
-        requires!(options, :login, :password)
+        requires!(options, :merchant_id, :password)
         @options = options
         @headers = {}
         @headers['Content-Type'] = "application/x-www-form-urlencoded;charset=utf-8"
@@ -106,17 +111,42 @@ module ActiveMerchant #:nodoc:
         add_address(post, creditcard, options)   
         add_customer_data(post, options)
              
-        commit('sale', money, post)
+        commit('PAY', money, post)
       end                       
-    
+
+      # def save_card(creditcard, options = {})
+      #   post = {}
+      #   add_invoice(post, options)
+      #   add_creditcard(post, creditcard)        
+      #   add_address(post, creditcard, options)   
+      #   add_customer_data(post, options)
+             
+      #   commit('MANAGE_CARD', money, post)
+      # end
+      
+      # authorization is the transaction.id
       def capture(money, authorization, options = {})
+        post = {}
+        add_invoice(post, {:vpc_MerchTxnRef => authorization, :order_id => options[:order_id]})
         commit('CAPTURE', money, post)
       end
-    
+
+      def refund(money, transaction_id, options = {})
+        post = {}
+        add_invoice(post, {:vpc_MerchTxnRef => transaction_id, :order_id => options[:order_id]})
+        commit('REFUND', money, post)
+      end
+      
+      def retrieve_transaction(order_id, transaction_id)
+        post = {}
+        add_invoice(post, {:order_id => order_id, :vpc_MerchTxnRef => transaction_id})
+        commit('RETRIEVE', nil, post)
+      end
+      
       private                       
       
       def add_customer_data(post, options)
-        post['customer.ipAddress'] = options[:ip_address]
+        post['customer.ipAddress'] = options[:ip_address] if options[:ip_address]
       end
 
       def add_address(post, creditcard, options)      
@@ -139,26 +169,30 @@ module ActiveMerchant #:nodoc:
       end
 
       def commit(action, money, parameters)
-        parameters[:merchant]     = @options[:login]
+        parameters[:merchant]     = @options[:merchant_id]
         parameters[:apiPassword]  = @options[:password]
         parameters[:apiOperation] = action
-        parameters['transaction.amount'] = amount(money)
-        parameters['transaction.currency'] = self.default_currency
 
-        puts "\nXXXXXXXXXXXXXXXX", "COMMITTING POST DATA: #{post_data(parameters)} length: #{post_data(parameters).length}"        , "XXXXXXXXXXXXXXXX\n\n"
+        if ['AUTHORIZE', 'CAPTURE', 'REFUND'].include?(action)
+          parameters['transaction.amount'] = amount(money)
+          parameters['transaction.currency'] = self.default_currency
+        end
+
+        url = test? ? self.test_url : self.live_url
         
-        data = parse( ssl_post(URL, post_data(parameters), @headers) )
+        puts "\n[XXXXXXXXXXXXXXXX]", "COMMITTING POST DATA: #{post_data(parameters)} URL: #{url}"        , "[XXXXXXXXXXXXXXXX]\n\n"
+       
+        data = parse( ssl_post(url, post_data(parameters), @headers) )
 
         success = SUCCESS_TYPES.include?(data["result"])
 
         message = message_from(data)
         
-        Response.new(success, message, data, 
-          :test => Base.test?, 
+        TnsResponse.new(success, message, data, 
+          :test => test?, 
           :authorization => data["transaction.receipt"],
           :cvv_result => data["response.cardSecurityCode.acquirerCode"],
-          :avs_result => { :code => data["avs"] }
-        )
+          :avs_result => { :code => data["avs"] })
       end
 
       def parse(body)
@@ -186,7 +220,21 @@ module ActiveMerchant #:nodoc:
       def post_data(parameters = {})
         parameters.collect { |key, value| "#{key}=#{ CGI.escape(value.to_s)}" }.join("&")
       end
+
     end
+
+    class TnsResponse < Response
+      # add a method to response so we can easily get the
+      # transaction_id and order_id
+      def transaction_id
+        @params["transaction.id"]
+      end
+
+      def order_id
+        @params["order.id"]
+      end
+    end
+
   end
 end
 

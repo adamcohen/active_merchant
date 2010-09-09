@@ -5,16 +5,14 @@ class RemoteTnsTest < Test::Unit::TestCase
 
   def setup
     # each order number has to be unique
-    File.open("tns_last_used_order_id.txt", File::RDWR|File::CREAT) do |file|
-      @order_id = file.read.chomp
-      file.rewind
-      file.puts(@order_id.to_i + 1)
-    end
+    @order_id = Time.now.to_f.to_s.delete(".")
+
+    @transaction_id = Time.now.strftime("%Y%m%d%H%M%S").to_i
     
-    @gateway = TnsGateway.new(fixtures(:tns_auth_capture1))
+    @gateway               = TnsGateway.new(fixtures(:tns_auth_capture1))
     @gateway_auth_capture2 = TnsGateway.new(fixtures(:tns_auth_capture2))
-    @gateway_purchase = TnsGateway.new(fixtures(:tns_purchase1))
-    @gateway_purchase2 = TnsGateway.new(fixtures(:tns_auth_capture2))
+    @gateway_purchase      = TnsGateway.new(fixtures(:tns_purchase1))
+    @gateway_purchase2     = TnsGateway.new(fixtures(:tns_purchase2))
 
     @amount                                      = 12000
     @unprocessable_transaction_amount            = 12010
@@ -39,11 +37,11 @@ class RemoteTnsTest < Test::Unit::TestCase
                                                         :verification_value => 102)
     
     @options = { 
-      :ip_address => '10.10.10.10',
-      :order_id => @order_id,
-      :billing_address => address,
-      :description => 'Store Purchase',
-      :vpc_MerchTxnRef => '1234'
+      :ip_address      => '10.10.10.10',
+      :order_id        =>  @order_id,
+      :billing_address =>  address,
+      :description     => 'Store Purchase',
+      :vpc_MerchTxnRef =>  @transaction_id
     }
   end
 
@@ -84,6 +82,9 @@ class RemoteTnsTest < Test::Unit::TestCase
   def test_authorize_fails_without_cvv
     assert response = @gateway.authorize(@amount, @visa_card_without_cvv, @options)
     assert_failure response
+    # sometimes the response.message is set to the following, so this
+    # test may occassionally fail:
+    # "Transaction blocked due to Risk or 3D Secure blocking rules"
     assert_equal "Parameter 'card.securityCode' is required. value: null - reason: No CSC value was provided", response.message
   end
 
@@ -164,28 +165,78 @@ class RemoteTnsTest < Test::Unit::TestCase
   end  
   
   def test_authorize_and_capture
-    amount = @amount
-    assert response = @gateway.authorize(amount, @visa_card, @options)
+    assert response = @gateway.authorize(@amount, @visa_card, @options)
     assert_success response
     assert_equal 'Transaction Approved', response.message
-    assert response.authorization
-    # assert capture = @gateway.capture(amount, auth.authorization)
-    # assert_success capture
+    assert response.transaction_id
+
+    assert capture = @gateway.capture(@amount, response.transaction_id.to_i + 1, :order_id => response.order_id)
+    assert_success capture
   end
 
-  # def test_failed_capture
-  #   assert response = @gateway.capture(@amount, '')
-  #   assert_failure response
-  #   assert_equal 'REPLACE WITH GATEWAY FAILURE MESSAGE', response.message
-  # end
+  def test_failed_capture
+    assert response = @gateway.capture(@amount, @transaction_id, :order_id => @order_id)
+    assert_failure response
+    assert_match /Parameter 'order\.id' value '#{@order_id[0..5]}xxxxx#{@order_id[-4..-1]}' is invalid. value: #{@order_id} - reason: No payments identified/, response.message
+  end
 
+  def test_authorize_and_capture_and_refund
+    assert response = @gateway.authorize(@amount, @visa_card, @options)
+    assert_success response
+    assert_equal 'Transaction Approved', response.message
+    assert response.transaction_id
+
+    assert capture = @gateway.capture(@amount, response.transaction_id.to_i + 1, response.order_id)
+    assert_success capture
+    
+    assert refund = @gateway.refund(@amount, response.transaction_id.to_i + 2, {:order_id => response.order_id})
+    assert_success refund
+  end
+  
+  def test_failed_refund
+    assert response = @gateway.refund(@amount, @transaction_id, {:order_id => @order_id})
+    assert_failure response
+    assert_match /Parameter 'order\.id' value '#{@order_id[0..5]}xxxxx#{@order_id[-4..-1]}' is invalid. value: #{@order_id} - reason: No payments identified/, response.message
+  end
+  
+  def test_retrieve_transaction
+    assert response = @gateway.authorize(@amount, @visa_card, @options)
+    assert_success response
+    assert_equal 'Transaction Approved', response.message
+    assert response.transaction_id
+
+    assert retrieve_transaction = @gateway.retrieve_transaction(response.order_id, response.transaction_id)
+    assert_success retrieve_transaction
+    assert_equal 'Transaction Approved', retrieve_transaction.message
+  end
+
+  def test_retrieve_declined_transaction
+    assert declined_by_issuer_response = @gateway.authorize(@transaction_declined_by_issuer_amount, @visa_card, @options)
+    assert_failure declined_by_issuer_response
+    assert_equal "Transaction declined by issuer", declined_by_issuer_response.message
+
+    assert retrieve_declined_transaction = @gateway.retrieve_transaction(declined_by_issuer_response.order_id, declined_by_issuer_response.transaction_id)
+    assert_failure retrieve_declined_transaction
+    assert_equal "Transaction declined by issuer", retrieve_declined_transaction.message
+  end
+  
   def test_invalid_login
     gateway = TnsGateway.new(
-                :login => '',
+                :merchant_id => '',
                 :password => ''
               )
     assert response = gateway.authorize(@amount, @visa_card, @options)
     assert_failure response
     assert_equal "Parameter 'apiPassword' value '' is invalid. Length is 0 characters, but must be at least 32", response.message
+  end
+
+  def test_incorrect_merchant_id
+    gateway = TnsGateway.new(
+                :merchant_id => 'VERYLONGMERCHANTIDENTIFIER',
+                :password => 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA'
+              )
+    assert response = gateway.authorize(@amount, @visa_card, @options)
+    assert_failure response
+    assert_match /Parameter 'merchant' value '.*' is invalid. Length is \d+ characters, but must be less than 17/, response.message
   end
 end

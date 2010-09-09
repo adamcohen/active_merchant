@@ -322,8 +322,20 @@ skipjack:
   password: Y 
 
 # TNS doesn't provide public testing data
-tns:
-  login: LOGIN
+tns_auth_capture1:
+  merchant_id: MERCHANT_ID
+  password: PASSWORD
+
+tns_auth_capture2:
+  merchant_id: MERCHANT_ID
+  password: PASSWORD
+
+tns_purchase1:
+  merchant_id: MERCHANT_ID
+  password: PASSWORD
+
+tns_purchase2:
+  merchant_id: MERCHANT_ID
   password: PASSWORD
 
 trans_first:
