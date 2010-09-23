@@ -195,9 +195,9 @@ module ActiveMerchant #:nodoc:
         puts "\n[XXXXXXXXXXXXXXXX]", "COMMITTING POST DATA: #{post_data(parameters)} URL: #{url}", "[XXXXXXXXXXXXXXXX]\n\n"
         
         if defined?(RAILS_DEFAULT_LOGGER)
-          RAILS_DEFAULT_LOGGER.info "\n[XXXXXXXXXXXXXXXX]"
-          RAILS_DEFAULT_LOGGER.info "COMMITTING POST DATA: #{post_data(parameters)} URL: #{url}"
-          RAILS_DEFAULT_LOGGER.info "[XXXXXXXXXXXXXXXX]\n\n"
+          RAILS_DEFAULT_LOGGER.debug "\n[XXXXXXXXXXXXXXXX]"
+          RAILS_DEFAULT_LOGGER.debug "COMMITTING POST DATA: #{post_data(parameters)} URL: #{url}"
+          RAILS_DEFAULT_LOGGER.debug "[XXXXXXXXXXXXXXXX]\n\n"
         end
        
         data = parse( ssl_post(url, post_data(parameters), @headers) )
@@ -215,9 +215,9 @@ module ActiveMerchant #:nodoc:
         puts "\n[XXXXXXXXXXXXXXXX]", "RESPONSE: #{response.inspect}", "[XXXXXXXXXXXXXXXX]\n\n"
         
         if defined?(RAILS_DEFAULT_LOGGER)
-          RAILS_DEFAULT_LOGGER.info "\n[XXXXXXXXXXXXXXXX]"
-          RAILS_DEFAULT_LOGGER.info "RESPONSE DATA FROM PAYMENT GATEWAY: #{response.inspect}"
-          RAILS_DEFAULT_LOGGER.info "[XXXXXXXXXXXXXXXX]\n\n"
+          RAILS_DEFAULT_LOGGER.debug "\n[XXXXXXXXXXXXXXXX]"
+          RAILS_DEFAULT_LOGGER.debug "RESPONSE DATA FROM PAYMENT GATEWAY: #{response.inspect}"
+          RAILS_DEFAULT_LOGGER.debug "[XXXXXXXXXXXXXXXX]\n\n"
         end
 
         return response
