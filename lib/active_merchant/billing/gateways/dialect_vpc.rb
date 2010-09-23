@@ -4,7 +4,7 @@ module ActiveMerchant #:nodoc:
     
     class DialectVpcGateway < Gateway
       
-      FILTERED_PARAMS = ['vpc_CardNum', 'vpc_CardExp', 'vpc_AccessCode', 'vpc_CardSecurityCode']
+      FILTERED_PARAMS = ['card_number', 'vpc_CardExp', 'vpc_AccessCode', 'vpc_CardSecurityCode']
       
       TRANSACTIONS = {
         :authorisation => 'pay',
@@ -49,10 +49,10 @@ module ActiveMerchant #:nodoc:
       def authorize(money, creditcard, options = {})
         params = {
           :vpc_Amount           => amount(money),
-          :vpc_CardNum          => creditcard.number,
+          :card_number          => creditcard.number,
           :vpc_CardExp          => expiry(creditcard),
           :vpc_CardSecurityCode => creditcard.verification_value,
-          :vpc_MerchTxnRef      => options[:vpc_MerchTxnRef],
+          :transaction_id      => options[:transaction_id],
           :vpc_OrderInfo        => options[:order_id]
         }
         commit(:authorisation, params)
@@ -61,10 +61,10 @@ module ActiveMerchant #:nodoc:
       def purchase(money, creditcard, options = {})
         params = {
           :vpc_Amount           => amount(money),
-          :vpc_CardNum          => creditcard.number,
+          :card_number          => creditcard.number,
           :vpc_CardExp          => expiry(creditcard),
           :vpc_CardSecurityCode => creditcard.verification_value,
-          :vpc_MerchTxnRef      => options[:vpc_MerchTxnRef],
+          :transaction_id      => options[:transaction_id],
           :vpc_OrderInfo        => options[:order_id]
         }
         commit(:purchase, params)
@@ -72,7 +72,7 @@ module ActiveMerchant #:nodoc:
       
       def capture(money, authorization, options = {})
         params = {
-          :vpc_MerchTxnRef => options[:vpc_MerchTxnRef],
+          :transaction_id => options[:transaction_id],
           :vpc_TransNo => authorization,
           :vpc_Amount => amount(money),
           :vpc_User => @options[:user],
@@ -89,7 +89,7 @@ module ActiveMerchant #:nodoc:
         params = {
           :vpc_RequestType      => 'payTemplate',
           :vpc_RequestCommand   => 'doCreateTemplate',
-          :vpc_CardNum          => creditcard.number,
+          :card_number          => creditcard.number,
           :vpc_CardExp          => expiry(creditcard)
         }
         commit(:store, params)
@@ -100,7 +100,7 @@ module ActiveMerchant #:nodoc:
           :vpc_RequestType      => 'payTemplate',
           :vpc_RequestCommand   => 'doSubTxn',
           :vpc_Amount           => amount(money),
-          :vpc_MerchTxnRef      => options[:vpc_MerchTxnRef],
+          :transaction_id      => options[:transaction_id],
           :vpc_OrderInfo        => options[:order_id],
           :vpc_TemplateNo       => options[:template_no]
         }

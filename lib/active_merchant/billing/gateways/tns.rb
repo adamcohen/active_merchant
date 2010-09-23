@@ -17,51 +17,51 @@ module ActiveMerchant #:nodoc:
       FAILURE_TYPES = ["FAILURE", "UNKNOWN"]
       GATEWAY_CODES = ["INVALID_REQUEST", "APPROVED"]
 
-      RESPONSE_GATEWAY_CODES = {
-        "APPROVED" => "Transaction Approved",
-        "UNSPECIFIED_FAILURE" => "Transaction could not be processed",
-        "DECLINED" => "Transaction declined by issuer",
-        "TIMED_OUT" => "Response timed out",
-        "EXPIRED_CARD" => "Transaction declined due to expired card",
-        "INSUFFICIENT_FUNDS" => "Transaction declined due to insufficient funds",
-        "ACQUIRER_SYSTEM_ERROR" => "Acquirer system error occured processing the transaction",
-        "SYSTEM_ERROR" => "Internal system error occured processing the transaction",
-        "NOT_SUPPORTED" => "Transaction type not supported",
-        "DECLINED_DO_NOT_CONTACT" => "Transaction declined - do not contact issuer",
-        "ABORTED" => "Transaction aborted by card holder",
-        "BLOCKED" => "Transaction blocked due to Risk or 3D Secure blocking rules",
-        "CANCELLED" => "Transaction cancelled by card holder",
+      RESPONSE_GATEWAY_CODES            = {
+        "APPROVED"                      => "Transaction Approved",
+        "UNSPECIFIED_FAILURE"           => "Transaction could not be processed",
+        "DECLINED"                      => "Transaction declined by issuer",
+        "TIMED_OUT"                     => "Response timed out",
+        "EXPIRED_CARD"                  => "Transaction declined due to expired card",
+        "INSUFFICIENT_FUNDS"            => "Transaction declined due to insufficient funds",
+        "ACQUIRER_SYSTEM_ERROR"         => "Acquirer system error occured processing the transaction",
+        "SYSTEM_ERROR"                  => "Internal system error occured processing the transaction",
+        "NOT_SUPPORTED"                 => "Transaction type not supported",
+        "DECLINED_DO_NOT_CONTACT"       => "Transaction declined - do not contact issuer",
+        "ABORTED"                       => "Transaction aborted by card holder",
+        "BLOCKED"                       => "Transaction blocked due to Risk or 3D Secure blocking rules",
+        "CANCELLED"                     => "Transaction cancelled by card holder",
         "DEFERRED_TRANSACTION_RECEIVED" => "Deferred transaction received and awaiting processing",
-        "REFERRED" => "Transaction declined - refer to issuer",
-        "AUTHENTICATION_FAILED" => "3D Secure authentication failed",
-        "INVALID_CSC" => "Invalid card security code",
-        "LOCK_FAILURE" => "Order locked - another transaction is in progress for this order",
-        "SUBMITTED" => "Transaction submitted - response has not yet been received",
-        "NOT_ENROLLED_3D_SECURE" => "Card holder is not enrolled in 3D Secure",
-        "PENDING" => "Transaction is pending",
-        "EXCEEDED_RETRY_LIMIT" => "Transaction retry limit exceeded",
-        "DUPLICATE_BATCH" => "Transaction declined due to duplicate batch",
-        "DECLINED_AVS" => "Transaction declined due to address verification",
-        "DECLINED_CSC" => "Transaction declined due to card security code",
-        "DECLINED_AVS_CSC" => "Transaction declined due to address verification and card security code",
-        "DECLINED_PAYMENT_PLAN" => "Transaction declined due to payment plan",
-        "UNKNOWN" => "Response unknown"
+        "REFERRED"                      => "Transaction declined - refer to issuer",
+        "AUTHENTICATION_FAILED"         => "3D Secure authentication failed",
+        "INVALID_CSC"                   => "Invalid card security code",
+        "LOCK_FAILURE"                  => "Order locked - another transaction is in progress for this order",
+        "SUBMITTED"                     => "Transaction submitted - response has not yet been received",
+        "NOT_ENROLLED_3D_SECURE"        => "Card holder is not enrolled in 3D Secure",
+        "PENDING"                       => "Transaction is pending",
+        "EXCEEDED_RETRY_LIMIT"          => "Transaction retry limit exceeded",
+        "DUPLICATE_BATCH"               => "Transaction declined due to duplicate batch",
+        "DECLINED_AVS"                  => "Transaction declined due to address verification",
+        "DECLINED_CSC"                  => "Transaction declined due to card security code",
+        "DECLINED_AVS_CSC"              => "Transaction declined due to address verification and card security code",
+        "DECLINED_PAYMENT_PLAN"         => "Transaction declined due to payment plan",
+        "UNKNOWN"                       => "Response unknown"
       }
 
-      TRANSACTION_TYPES = {
-        "AUTHORIZATION" => "Authorization",
-        "BALANCE_ENQUIRY" => "Balance Enquiry",
-        "CAPTURE" => "Capture",
-        "CREDIT_PAYMENT" => "Credit Payment",
-        "PRE_AUTHORIZATION" => "Pre-Authorization",
-        "PAYMENT" => "Payment (Purchase)",
-        "REFUND" => "Refund",
-        "VOID_AUTHORIZATION" => "Void Authorization",
-        "VOID_CAPTURE" => "Void Capture",
+      TRANSACTION_TYPES       = {
+        "AUTHORIZATION"       => "Authorization",
+        "BALANCE_ENQUIRY"     => "Balance Enquiry",
+        "CAPTURE"             => "Capture",
+        "CREDIT_PAYMENT"      => "Credit Payment",
+        "PRE_AUTHORIZATION"   => "Pre-Authorization",
+        "PAYMENT"             => "Payment (Purchase)",
+        "REFUND"              => "Refund",
+        "VOID_AUTHORIZATION"  => "Void Authorization",
+        "VOID_CAPTURE"        => "Void Capture",
         "VOID_CREDIT_PAYMENT" => "Void Credit Payment",
-        "VOID_PAYMENT" => "Void Payment",
-        "VOID_REFUND" => "Void Refund",
-        "OTHER" => "Other transaction types"
+        "VOID_PAYMENT"        => "Void Payment",
+        "VOID_REFUND"         => "Void Refund",
+        "OTHER"               => "Other transaction types"
       }
       
 
@@ -95,9 +95,9 @@ module ActiveMerchant #:nodoc:
       
       def authorize(money, creditcard, options = {})
         post = {}
-
+        post['card.token'] = options['card.token'] unless options['card.token'].blank?
         add_invoice(post, options)
-        add_creditcard(post, creditcard)
+        add_creditcard(post, creditcard) unless creditcard.blank?
         # add_address(post, creditcard, options)        
         add_customer_data(post, options)
 
@@ -114,32 +114,44 @@ module ActiveMerchant #:nodoc:
         commit('PAY', money, post)
       end                       
 
-      # def save_card(creditcard, options = {})
-      #   post = {}
-      #   add_invoice(post, options)
-      #   add_creditcard(post, creditcard)        
-      #   add_address(post, creditcard, options)   
-      #   add_customer_data(post, options)
-             
-      #   commit('MANAGE_CARD', money, post)
-      # end
-      
-      # authorization is the transaction.id
-      def capture(money, authorization, options = {})
+      def store(creditcard, options = {})       
         post = {}
-        add_invoice(post, {:vpc_MerchTxnRef => authorization, :order_id => options[:order_id]})
+
+        # store card operation doesn't need the creditcard.first_name field
+        creditcard.first_name = nil if creditcard.first_name
+
+        add_creditcard(post, creditcard)
+
+        post['action.tokenOperation'] = 'SAVE'
+        
+        commit('MANAGE_CARD', nil, post)
+      end
+      
+      def capture(money, transaction_id, options = {})
+        post = {}
+        post['transaction.id'] = transaction_id
+        add_invoice(post, options)
+
         commit('CAPTURE', money, post)
       end
 
       def refund(money, transaction_id, options = {})
         post = {}
-        add_invoice(post, {:vpc_MerchTxnRef => transaction_id, :order_id => options[:order_id]})
+        post['transaction.id'] = transaction_id
+        add_invoice(post, options)
         commit('REFUND', money, post)
       end
       
+      def authorize_with_token(money, transaction_id, card_token, options = {})
+        post = {'card.token' => card_token}
+        add_invoice(post, {:vpc_MerchTxnRef => transaction_id, :order_id => options[:order_id]})
+        add_customer_data(post, options)
+        commit('AUTHORIZE', money, post)
+      end
+
       def retrieve_transaction(order_id, transaction_id)
         post = {}
-        add_invoice(post, {:order_id => order_id, :vpc_MerchTxnRef => transaction_id})
+        add_invoice(post, {:order_id => order_id, :transaction_id => transaction_id})
         commit('RETRIEVE', nil, post)
       end
       
@@ -157,14 +169,14 @@ module ActiveMerchant #:nodoc:
         post['order.id'] = options[:order_id]
 
         # The unique identifier of the transaction, to distinguish it from other transactions on the order
-        post['transaction.id'] = options[:vpc_MerchTxnRef]
+        post['transaction.id'] = options[:transaction_id] if options.has_key? :transaction_id
       end
       
       def add_creditcard(post, creditcard)
-        post['card.holder.fullName'] = creditcard.first_name
+        post['card.holder.fullName'] = creditcard.first_name if creditcard.first_name.present?
         post['card.number']          = creditcard.number
         post['card.expiry.month']    = creditcard.month
-        post['card.expiry.year']     = creditcard.year
+        post['card.expiry.year']     = format(creditcard.year,:two_digits)
         post['card.securityCode']    = creditcard.verification_value if creditcard.verification_value.present?
       end
 
@@ -177,10 +189,16 @@ module ActiveMerchant #:nodoc:
           parameters['transaction.amount'] = amount(money)
           parameters['transaction.currency'] = self.default_currency
         end
-
-        url = test? ? self.test_url : self.live_url
         
-        puts "\n[XXXXXXXXXXXXXXXX]", "COMMITTING POST DATA: #{post_data(parameters)} URL: #{url}"        , "[XXXXXXXXXXXXXXXX]\n\n"
+        url = test? ? self.test_url : self.live_url
+
+        puts "\n[XXXXXXXXXXXXXXXX]", "COMMITTING POST DATA: #{post_data(parameters)} URL: #{url}", "[XXXXXXXXXXXXXXXX]\n\n"
+        
+        if defined?(RAILS_DEFAULT_LOGGER)
+          RAILS_DEFAULT_LOGGER.info "\n[XXXXXXXXXXXXXXXX]"
+          RAILS_DEFAULT_LOGGER.info "COMMITTING POST DATA: #{post_data(parameters)} URL: #{url}"
+          RAILS_DEFAULT_LOGGER.info "[XXXXXXXXXXXXXXXX]\n\n"
+        end
        
         data = parse( ssl_post(url, post_data(parameters), @headers) )
 
@@ -188,11 +206,21 @@ module ActiveMerchant #:nodoc:
 
         message = message_from(data)
         
-        TnsResponse.new(success, message, data, 
+        response = TnsResponse.new(success, message, data, 
           :test => test?, 
           :authorization => data["transaction.receipt"],
           :cvv_result => data["response.cardSecurityCode.acquirerCode"],
           :avs_result => { :code => data["avs"] })
+
+        puts "\n[XXXXXXXXXXXXXXXX]", "RESPONSE: #{response.inspect}", "[XXXXXXXXXXXXXXXX]\n\n"
+        
+        if defined?(RAILS_DEFAULT_LOGGER)
+          RAILS_DEFAULT_LOGGER.info "\n[XXXXXXXXXXXXXXXX]"
+          RAILS_DEFAULT_LOGGER.info "RESPONSE DATA FROM PAYMENT GATEWAY: #{response.inspect}"
+          RAILS_DEFAULT_LOGGER.info "[XXXXXXXXXXXXXXXX]\n\n"
+        end
+
+        return response
       end
 
       def parse(body)
@@ -207,13 +235,12 @@ module ActiveMerchant #:nodoc:
       end      
       
       def message_from(response)
-        puts "RESPONSE: #{response.inspect}"
         if response["result"] == "ERROR"
-          response_message = CGI.unescape(response["explanation"] || response["supportCode"])
+          response_message = CGI.unescape(response["error.explanation"] || response["supportCode"] || "Unsupported error")
         else
           response_message = RESPONSE_GATEWAY_CODES[response["response.gatewayCode"]]          
         end
-        puts "RESPONSE_MESSAGE: #{response_message.inspect}"
+
         return response_message
       end
       
@@ -230,8 +257,20 @@ module ActiveMerchant #:nodoc:
         @params["transaction.id"]
       end
 
+      def gateway_code
+        @params["response.gatewayCode"]
+      end
+
+      def transaction_amount
+        @params["transaction.amount"]
+      end
+
       def order_id
         @params["order.id"]
+      end
+      
+      def stored_card_token
+        @params["card.token"]
       end
     end
 
