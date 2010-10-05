@@ -338,6 +338,10 @@ tns_purchase2:
   merchant_id: MERCHANT_ID
   password: PASSWORD
 
+tns:
+  merchant_id: MERCHANT_ID
+  password: PASSWORD
+
 trans_first:
   login: LOGIN
   password: PASSWORD

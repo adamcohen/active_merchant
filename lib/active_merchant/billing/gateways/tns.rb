@@ -2,10 +2,12 @@
 module ActiveMerchant #:nodoc:
   module Billing #:nodoc:
     class TnsGateway < Gateway
-      class_inheritable_accessor :test_url, :live_url, :arb_test_url, :arb_live_url
+      class_inheritable_accessor :url
 
-      self.test_url = 'https://staging.uat.dialectpayments.com/api/nvp/version/1'
-      self.live_url = 'https://dialectpayments.com/api/nvp/version/1'
+      # TNS uses only one url for both testing and live transactions
+      # To perform test transactions, you need to use a test
+      # merchant_id account
+      self.url = 'https://secure.ap.tnspayments.com/api/nvp/version/1'
 
       # possible result codes
       # SUCCESS The transaction was successfully processed
@@ -189,18 +191,19 @@ module ActiveMerchant #:nodoc:
           parameters['transaction.amount'] = amount(money)
           parameters['transaction.currency'] = self.default_currency
         end
-        
-        url = test? ? self.test_url : self.live_url
 
-        puts "\n[XXXXXXXXXXXXXXXX]", "COMMITTING POST DATA: #{post_data(parameters)} URL: #{url}", "[XXXXXXXXXXXXXXXX]\n\n"
+        # TODO: remove this logging stuff after we iron out the
+        # initial bugs
+        filtered_post_data = post_data(parameters.merge("card.number" => "[FILTERED]", "card.expiry.month" => "[FILTERED]", "card.securityCode" => "[FILTERED]"))
+        puts "\n[XXXXXXXXXXXXXXXX]", "POSTING DATA TO URL: #{self.url}: #{filtered_post_data} ", "[XXXXXXXXXXXXXXXX]\n\n"
         
-        if defined?(RAILS_DEFAULT_LOGGER)
-          RAILS_DEFAULT_LOGGER.debug "\n[XXXXXXXXXXXXXXXX]"
-          RAILS_DEFAULT_LOGGER.debug "COMMITTING POST DATA: #{post_data(parameters)} URL: #{url}"
-          RAILS_DEFAULT_LOGGER.debug "[XXXXXXXXXXXXXXXX]\n\n"
-        end
+        # if defined?(RAILS_DEFAULT_LOGGER)
+        #   RAILS_DEFAULT_LOGGER.debug "\n[XXXXXXXXXXXXXXXX]"
+        #   RAILS_DEFAULT_LOGGER.debug "POSTING DATA TO URL: #{self.url}: #{filtered_post_data} "
+        #   RAILS_DEFAULT_LOGGER.debug "[XXXXXXXXXXXXXXXX]\n\n"
+        # end
        
-        data = parse( ssl_post(url, post_data(parameters), @headers) )
+        data = parse( ssl_post(self.url, post_data(parameters), @headers) )
 
         success = SUCCESS_TYPES.include?(data["result"])
 
@@ -212,13 +215,13 @@ module ActiveMerchant #:nodoc:
           :cvv_result => data["response.cardSecurityCode.acquirerCode"],
           :avs_result => { :code => data["avs"] })
 
-        puts "\n[XXXXXXXXXXXXXXXX]", "RESPONSE: #{response.inspect}", "[XXXXXXXXXXXXXXXX]\n\n"
+        puts "\n[XXXXXXXXXXXXXXXX]", "RESPONSE DATA FROM PAYMENT GATEWAY: #{response.inspect}", "[XXXXXXXXXXXXXXXX]\n\n"
         
-        if defined?(RAILS_DEFAULT_LOGGER)
-          RAILS_DEFAULT_LOGGER.debug "\n[XXXXXXXXXXXXXXXX]"
-          RAILS_DEFAULT_LOGGER.debug "RESPONSE DATA FROM PAYMENT GATEWAY: #{response.inspect}"
-          RAILS_DEFAULT_LOGGER.debug "[XXXXXXXXXXXXXXXX]\n\n"
-        end
+        # if defined?(RAILS_DEFAULT_LOGGER)
+        #   RAILS_DEFAULT_LOGGER.debug "\n[XXXXXXXXXXXXXXXX]"
+        #   RAILS_DEFAULT_LOGGER.debug "RESPONSE DATA FROM PAYMENT GATEWAY: #{response.inspect}"
+        #   RAILS_DEFAULT_LOGGER.debug "[XXXXXXXXXXXXXXXX]\n\n"
+        # end
 
         return response
       end

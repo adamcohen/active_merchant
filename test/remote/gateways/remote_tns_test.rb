@@ -10,13 +10,14 @@ class RemoteTnsTest < Test::Unit::TestCase
     @order_id = Time.now.to_f.to_s.delete(".")
 
     @transaction_id = Time.now.strftime("%Y%m%d%H%M%S").to_i
-    
-    @gateway               = TnsGateway.new(fixtures(:tns_auth_capture1))
+
+    @gateway               = TnsGateway.new(fixtures(:tns))
     @gateway_auth_capture2 = TnsGateway.new(fixtures(:tns_auth_capture2))
     @gateway_purchase      = TnsGateway.new(fixtures(:tns_purchase1))
     @gateway_purchase2     = TnsGateway.new(fixtures(:tns_purchase2))
 
     @amount                                      = 12000
+    @nonzero_cent_amount                         = 12011
     @unprocessable_transaction_amount            = 12010
     @transaction_declined_refer_to_issuer_amount = 12001
     @transaction_declined_by_issuer_amount       = 12005
@@ -76,37 +77,43 @@ class RemoteTnsTest < Test::Unit::TestCase
     assert_equal 'Transaction Approved', response.message
   end
 
-  def test_authorize_with_multiple_merchants
-    assert response = @gateway_auth_capture2.authorize(@amount, @visa_card, @options)
-    assert_success response
-    assert_equal 'Transaction Approved', response.message
+  def test_authorize_fails_with_nonzero_cent_amount
+    assert response = @gateway.authorize(@nonzero_cent_amount, @visa_card, @options)
+    assert_failure response
+    assert_equal 'Transaction could not be processed', response.message
   end
 
-  # CSC must be set as required in your merchant administration preferences
-  # for this test to pass
+  # def test_authorize_with_multiple_merchants
+  #   assert response = @gateway_auth_capture2.authorize(@amount, @visa_card, @options)
+  #   assert_success response
+  #   assert_equal 'Transaction Approved', response.message
+  # end
+
+  # The following 4 tests are dependent on the CSC rules as specified
+  # in your merchant administration preferences
   # def test_authorize_fails_without_cvv
   #   assert response = @gateway.authorize(@amount, @visa_card_without_cvv, @options)
   #   assert_failure response
   #   assert_equal "Parameter 'card.securityCode' is required. value: null - reason: No CSC value was provided", response.message
   # end
 
-  def test_authorize_fails_with_invalid_cvv_code
-    assert response = @gateway.authorize(@amount, @visa_card_with_invalid_cvv_code, @options)
-    assert_failure response
-    assert_equal 'Transaction blocked due to Risk or 3D Secure blocking rules', response.message
-  end
+  # def test_authorize_fails_with_invalid_cvv_code
+  #   assert response = @gateway.authorize(@amount, @visa_card_with_invalid_cvv_code, @options)
+  #   assert_failure response
+  #   assert_equal 'Transaction blocked due to Risk or 3D Secure blocking rules', response.message
+  # end
 
-  def test_authorize_fails_with_unprocessed_cvv_code
-    assert response = @gateway.authorize(@amount, @visa_card_with_unprocessed_cvv_code, @options)
-    assert_failure response
-    assert_equal 'Transaction blocked due to Risk or 3D Secure blocking rules', response.message
-  end
+  # def test_authorize_fails_with_unprocessed_cvv_code
+  #   assert response = @gateway.authorize(@amount, @visa_card_with_unprocessed_cvv_code, @options)
+  #   assert_failure response
+  #   assert_equal 'Transaction blocked due to Risk or 3D Secure blocking rules', response.message
+  # end
 
-  def test_authorize_fails_with_unregistered_cvv_code
-    assert response = @gateway.authorize(@amount, @visa_card_with_unregistered_cvv_code, @options)
-    assert_failure response
-    assert_equal 'Transaction blocked due to Risk or 3D Secure blocking rules', response.message
-  end
+  # def test_authorize_fails_with_unregistered_cvv_code
+  #   assert response = @gateway.authorize(@amount, @visa_card_with_unregistered_cvv_code, @options)
+  #   assert_failure response
+  #   assert_equal 'Transaction blocked due to Risk or 3D Secure blocking rules', response.message
+  # end
 
   def test_authorize_must_have_unique_id
     assert response = @gateway.authorize(@amount, @visa_card, @options)
@@ -121,7 +128,7 @@ class RemoteTnsTest < Test::Unit::TestCase
   def test_authorize_with_invalid_credit_card
     assert response = @gateway.authorize(@amount, @invalid_visa_card, @options)
     assert_failure response
-    assert_equal 'Transaction declined by issuer', response.message
+    assert_equal 'Transaction could not be processed', response.message
   end
 
   def test_authorize_with_expired_credit_card
@@ -289,7 +296,7 @@ class RemoteTnsTest < Test::Unit::TestCase
     card_token = response.stored_card_token
     response = @gateway.authorize(@transaction_declined_refer_to_issuer_amount, nil, @options.merge('card.token' => card_token))
     assert_failure response
-    assert_equal 'Transaction declined - refer to issuer', response.message
+    assert_equal 'Transaction declined by issuer', response.message
   end
 
   def test_invalid_login
