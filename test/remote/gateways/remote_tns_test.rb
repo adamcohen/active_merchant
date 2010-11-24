@@ -26,6 +26,7 @@ class RemoteTnsTest < Test::Unit::TestCase
     @insufficient_credit_amount                  = 12051
 
     @visa_card                            = credit_card('4987654321098769', :month => 5, :year => 13)
+    @visa_card_with_weird_name            = credit_card('4987654321098769', :month => 5, :year => 13, :first_name => "scriptalert><s")
     @visa_card_without_name               = credit_card('4987654321098769', :month => 5, :year => 13, :first_name => nil)
     @invalid_visa_card                    = credit_card('4111111111111111', :month => 5, :year => 13)
     @visa_card_without_cvv                = credit_card('4987654321098769', :month => 5, :year => 13,
@@ -83,6 +84,12 @@ class RemoteTnsTest < Test::Unit::TestCase
     assert_equal 'Transaction could not be processed', response.message
   end
 
+  def test_authorize_succeeds_with_weird_name
+    assert response = @gateway.authorize(@amount, @visa_card_with_weird_name, @options)
+    assert_success response
+    assert_equal 'Transaction Approved', response.message
+  end  
+  
   # def test_authorize_with_multiple_merchants
   #   assert response = @gateway_auth_capture2.authorize(@amount, @visa_card, @options)
   #   assert_success response
@@ -178,6 +185,16 @@ class RemoteTnsTest < Test::Unit::TestCase
     assert response.transaction_id
 
     assert capture = @gateway.capture(@amount, response.transaction_id.to_i + 1, :order_id => response.order_id)
+    assert_success capture
+  end
+
+  def test_authorize_and_capture_with_nonzero_cent_amount
+    assert response = @gateway.authorize(@amount, @visa_card, @options)
+    assert_success response
+    assert_equal 'Transaction Approved', response.message
+    assert response.transaction_id
+
+    assert capture = @gateway.capture(5084, response.transaction_id.to_i + 1, :order_id => response.order_id)
     assert_success capture
   end
 
@@ -306,7 +323,7 @@ class RemoteTnsTest < Test::Unit::TestCase
               )
     assert response = gateway.authorize(@amount, @visa_card, @options)
     assert_failure response
-    assert_equal "Parameter 'apiPassword' value '' is invalid. Length is 0 characters, but must be at least 32", response.message
+    assert_equal "Parameter 'apiPassword' value 'xxxxxxx' is invalid. Length is 0 characters, but must be at least 32", response.message
   end
 
   def test_incorrect_merchant_id

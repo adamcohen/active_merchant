@@ -100,7 +100,7 @@ module ActiveMerchant #:nodoc:
         post['card.token'] = options['card.token'] unless options['card.token'].blank?
         add_invoice(post, options)
         add_creditcard(post, creditcard) unless creditcard.blank?
-        # add_address(post, creditcard, options)        
+        add_address(post, creditcard, options)
         add_customer_data(post, options)
 
        commit('AUTHORIZE', money, post)
@@ -157,13 +157,19 @@ module ActiveMerchant #:nodoc:
         commit('RETRIEVE', nil, post)
       end
       
-      private                       
+      private
       
       def add_customer_data(post, options)
         post['customer.ipAddress'] = options[:ip_address] if options[:ip_address]
       end
 
       def add_address(post, creditcard, options)      
+        # post['billing.address.city']          = options[:city]
+        # post['billing.address.country']       = options[:country]
+        # post['billing.address.phone']         = options[:phone]
+        # post['billing.address.postcodeZip']   = options[:postal_code]
+        # post['billing.address.stateProvince'] = options[:state]
+        # post['billing.address.street']        = options[:street]
       end
 
       def add_invoice(post, options)
@@ -197,11 +203,11 @@ module ActiveMerchant #:nodoc:
         filtered_post_data = post_data(parameters.merge("card.number" => "[FILTERED]", "card.expiry.month" => "[FILTERED]", "card.securityCode" => "[FILTERED]"))
         puts "\n[XXXXXXXXXXXXXXXX]", "POSTING DATA TO URL: #{self.url}: #{filtered_post_data} ", "[XXXXXXXXXXXXXXXX]\n\n"
         
-        # if defined?(RAILS_DEFAULT_LOGGER)
-        #   RAILS_DEFAULT_LOGGER.debug "\n[XXXXXXXXXXXXXXXX]"
-        #   RAILS_DEFAULT_LOGGER.debug "POSTING DATA TO URL: #{self.url}: #{filtered_post_data} "
-        #   RAILS_DEFAULT_LOGGER.debug "[XXXXXXXXXXXXXXXX]\n\n"
-        # end
+        if defined?(RAILS_DEFAULT_LOGGER)
+          RAILS_DEFAULT_LOGGER.debug "\n[XXXXXXXXXXXXXXXX]"
+          RAILS_DEFAULT_LOGGER.debug "POSTING DATA TO URL: #{self.url}: #{filtered_post_data} "
+          RAILS_DEFAULT_LOGGER.debug "[XXXXXXXXXXXXXXXX]\n\n"
+        end
        
         data = parse( ssl_post(self.url, post_data(parameters), @headers) )
 
@@ -217,11 +223,11 @@ module ActiveMerchant #:nodoc:
 
         puts "\n[XXXXXXXXXXXXXXXX]", "RESPONSE DATA FROM PAYMENT GATEWAY: #{response.inspect}", "[XXXXXXXXXXXXXXXX]\n\n"
         
-        # if defined?(RAILS_DEFAULT_LOGGER)
-        #   RAILS_DEFAULT_LOGGER.debug "\n[XXXXXXXXXXXXXXXX]"
-        #   RAILS_DEFAULT_LOGGER.debug "RESPONSE DATA FROM PAYMENT GATEWAY: #{response.inspect}"
-        #   RAILS_DEFAULT_LOGGER.debug "[XXXXXXXXXXXXXXXX]\n\n"
-        # end
+        if defined?(RAILS_DEFAULT_LOGGER)
+          RAILS_DEFAULT_LOGGER.debug "\n[XXXXXXXXXXXXXXXX]"
+          RAILS_DEFAULT_LOGGER.debug "RESPONSE DATA FROM PAYMENT GATEWAY: #{response.inspect}"
+          RAILS_DEFAULT_LOGGER.debug "[XXXXXXXXXXXXXXXX]\n\n"
+        end
 
         return response
       end
