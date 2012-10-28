@@ -3,7 +3,7 @@ require 'test_helper'
 class TnsTest < Test::Unit::TestCase
   def setup
     @gateway = TnsGateway.new(
-                 :login => 'TestMerchant',
+                 :merchant_id => 'TestMerchant',
                  :password => 'password'
                )
 
@@ -13,7 +13,7 @@ class TnsTest < Test::Unit::TestCase
     @options = { 
       :order_id => '1',
       :billing_address => address,
-      :description => 'Store Purchase'
+      :description => 'Store Purchase',
     }
   end
   
@@ -26,6 +26,13 @@ class TnsTest < Test::Unit::TestCase
     
     assert_equal '100831000004', response.authorization
     assert response.test?
+  end
+
+  def test_currency
+    assert_equal 'AUD', @gateway.default_currency
+
+    @gateway.default_currency = 'GBP'
+    assert_equal 'GBP', @gateway.default_currency
   end
 
   def test_unsuccessful_request

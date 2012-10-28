@@ -3,10 +3,12 @@ module ActiveMerchant #:nodoc:
     class SagePayGateway < Gateway  
       cattr_accessor :simulate
       self.simulate = false
-      
-      TEST_URL = 'https://test.sagepay.com/gateway/service'
-      LIVE_URL = 'https://live.sagepay.com/gateway/service'
-      SIMULATOR_URL = 'https://test.sagepay.com/Simulator'
+
+      class_attribute :simulator_url
+
+      self.test_url = 'https://test.sagepay.com/gateway/service'
+      self.live_url = 'https://live.sagepay.com/gateway/service'
+      self.simulator_url = 'https://test.sagepay.com/Simulator'
       
       APPROVED = 'OK'
     
@@ -32,8 +34,6 @@ module ActiveMerchant #:nodoc:
         :jcb => "JCB"
       }
 
-      CURRENCIES_WITHOUT_FRACTIONS = [ 'YEN' ]
-      
       ELECTRON = /^(424519|42496[23]|450875|48440[6-8]|4844[1-5][1-5]|4917[3-5][0-9]|491880)\d{10}(\d{3})?$/
       
       AVS_CVV_CODE = {
@@ -107,8 +107,8 @@ module ActiveMerchant #:nodoc:
         commit(action, post)
       end
 
-      # Crediting requires a new order_id to passed in, as well as a description
-      def credit(money, identification, options = {})
+      # Refunding requires a new order_id to passed in, as well as a description
+      def refund(money, identification, options = {})
         requires!(options, :order_id, :description)
         
         post = {}
@@ -118,6 +118,11 @@ module ActiveMerchant #:nodoc:
         add_invoice(post, options)
         
         commit(:credit, post)
+      end
+
+      def credit(money, identification, options = {})
+        deprecated CREDIT_DEPRECATION_MESSAGE
+        refund(money, identification, options)
       end
       
       private
@@ -262,12 +267,12 @@ module ActiveMerchant #:nodoc:
       
       def build_url(action)
         endpoint = [ :purchase, :authorization ].include?(action) ? "vspdirect-register" : TRANSACTIONS[action].downcase
-        "#{test? ? TEST_URL : LIVE_URL}/#{endpoint}.vsp"
+        "#{test? ? self.test_url : self.live_url}/#{endpoint}.vsp"
       end
       
       def build_simulator_url(action)
         endpoint = [ :purchase, :authorization ].include?(action) ? "VSPDirectGateway.asp" : "VSPServerGateway.asp?Service=Vendor#{TRANSACTIONS[action].capitalize}Tx"
-        "#{SIMULATOR_URL}/#{endpoint}"
+        "#{self.simulator_url}/#{endpoint}"
       end
 
       def message_from(response)

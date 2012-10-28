@@ -2,7 +2,10 @@
 require 'test_helper'
 
 # run these tests using:
-# ruby -I test test/remote/gateways/remote_tns_test.rb
+# cd vendor/gems/active_merchant-1.7.2; 
+# bundle exec ruby -I test test/remote/gateways/remote_tns_test.rb
+
+# testing credentials are stored in ~/.active_merchant/fixtures.yml
 class RemoteTnsTest < Test::Unit::TestCase
 
   def setup
@@ -15,6 +18,13 @@ class RemoteTnsTest < Test::Unit::TestCase
     @gateway_auth_capture2 = TnsGateway.new(fixtures(:tns_auth_capture2))
     @gateway_purchase      = TnsGateway.new(fixtures(:tns_purchase1))
     @gateway_purchase2     = TnsGateway.new(fixtures(:tns_purchase2))
+
+    # need to configure the proxy host/port to get this test working
+    # on ci. Also need to add http_proxy_host and http_proxy_port
+    # configuration directives to the ~/.active_merchant/fixtures.yml
+    # file
+    TnsGateway.http_proxy_host = fixtures(:tns)[:http_proxy_host]
+    TnsGateway.http_proxy_port = fixtures(:tns)[:http_proxy_port]
 
     @amount                                      = 12000
     @nonzero_cent_amount                         = 12011
@@ -46,7 +56,7 @@ class RemoteTnsTest < Test::Unit::TestCase
       :order_id        =>  @order_id,
       :billing_address =>  address,
       :description     => 'Store Purchase',
-      :transaction_id =>  @transaction_id
+      :transaction_id  =>  @transaction_id
     }
   end
 
@@ -224,7 +234,7 @@ class RemoteTnsTest < Test::Unit::TestCase
   def test_failed_capture
     assert response = @gateway.capture(@amount, @transaction_id, :order_id => @order_id)
     assert_failure response
-    assert_match /Parameter 'order\.id' value '#{@order_id[0..5]}[x]{4,}#{@order_id[-4..-1]}' is invalid. value: #{@order_id} - reason: No payments identified/, response.message
+    assert_match /Parameter 'order\.id' value '#{@order_id}' is invalid. value: #{@order_id} - reason: No payments identified/, response.message
   end
 
   def test_authorize_and_capture_and_refund
@@ -243,7 +253,7 @@ class RemoteTnsTest < Test::Unit::TestCase
   def test_failed_refund
     assert response = @gateway.refund(@amount, @transaction_id, {:order_id => @order_id})
     assert_failure response
-    assert_match /Parameter 'order\.id' value '#{@order_id[0..5]}[x]{4,}#{@order_id[-4..-1]}' is invalid. value: #{@order_id} - reason: No payments identified/, response.message
+    assert_match /Parameter 'order\.id' value '#{@order_id}' is invalid. value: #{@order_id} - reason: No payments identified/, response.message
   end
   
   def test_retrieve_transaction
@@ -323,7 +333,7 @@ class RemoteTnsTest < Test::Unit::TestCase
               )
     assert response = gateway.authorize(@amount, @visa_card, @options)
     assert_failure response
-    assert_equal "Parameter 'apiPassword' value 'xxxxxxx' is invalid. Length is 0 characters, but must be at least 32", response.message
+    assert_equal "Parameter 'merchant' value '' is invalid. Length is 0 characters, but must be at least 1", response.message
   end
 
   def test_incorrect_merchant_id

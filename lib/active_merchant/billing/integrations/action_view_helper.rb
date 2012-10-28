@@ -1,4 +1,4 @@
-require_library_or_gem 'action_pack'
+require 'action_pack'
 
 module ActiveMerchant #:nodoc:
   module Billing #:nodoc:
@@ -21,7 +21,7 @@ module ActiveMerchant #:nodoc:
         #    <% service.customer :first_name => 'Cody',
         #                       :last_name => 'Fauser',
         #                       :phone => '(555)555-5555',
-        #                       :email => 'codyfauser@gmail.com' %>
+        #                       :email => 'cody@example.com' %>
         #
         #    <% service.billing_address :city => 'Ottawa',
         #                              :address1 => '21 Snowy Brook Lane',
@@ -39,36 +39,33 @@ module ActiveMerchant #:nodoc:
         #    <% service.cancel_return_url 'http://mystore.com' %>
         #  <% end %>
         #
-        def payment_service_for(order, account, options = {}, &proc)          
+        def payment_service_for(order, account, options = {}, &proc)
           raise ArgumentError, "Missing block" unless block_given?
 
-          integration_module = ActiveMerchant::Billing::Integrations.const_get(options.delete(:service).to_s.classify)
-
-          result = []
-          result << form_tag(integration_module.service_url, options.delete(:html) || {})
-          
+          integration_module = ActiveMerchant::Billing::Integrations.const_get(options.delete(:service).to_s.camelize)
           service_class = integration_module.const_get('Helper')
+
+          form_options = options.delete(:html) || {}
           service = service_class.new(order, account, options)
+          form_options[:method] = service.form_method
+          result = []
+          result << form_tag(integration_module.service_url, form_options)
 
           result << capture(service, &proc)
 
           service.form_fields.each do |field, value|
             result << hidden_field_tag(field, value)
           end
-         
-          result << '</form>'
-
-          concat(html_safe_string(result.join("\n")))
-        end
-        
-        private
-        
-        def html_safe_string(string)
-          if string.respond_to?(:html_safe)
-            string.html_safe
-          else
-            string
+          
+          service.raw_html_fields.each do |field, value|
+            result << "<input id=\"#{field}\" name=\"#{field}\" type=\"hidden\" value=\"#{value}\" />\n"
           end
+          
+          result << '</form>'
+          result= result.join("\n")
+          
+          concat(result.respond_to?(:html_safe) ? result.html_safe : result)
+          nil
         end
       end
     end

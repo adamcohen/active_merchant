@@ -103,7 +103,7 @@ module ActiveMerchant #:nodoc:
         add_address(post, creditcard, options)
         add_customer_data(post, options)
 
-       commit('AUTHORIZE', money, post)
+        commit('AUTHORIZE', money, post)
       end
       
       def purchase(money, creditcard, options = {})
@@ -242,7 +242,7 @@ module ActiveMerchant #:nodoc:
 
         results
       end      
-      
+
       def message_from(response)
         if response["result"] == "ERROR"
           response_message = CGI.unescape(response["error.explanation"] || response["supportCode"] || "Unsupported error")
@@ -260,13 +260,12 @@ module ActiveMerchant #:nodoc:
     end
 
     class TnsResponse < Response
-      # add a method to response so we can easily get the
-      # transaction_id and order_id
+
       def transaction_id
         @params["transaction.id"]
       end
 
-      def gateway_code
+      def response_code
         @params["response.gatewayCode"]
       end
 
@@ -281,6 +280,23 @@ module ActiveMerchant #:nodoc:
       def stored_card_token
         @params["card.token"]
       end
+      
+      def risk_code
+        @params["response.risk.gatewayCode"]
+      end
+
+      def debug_information
+        @params["response.debugInformation"]
+      end
+
+      def amount
+        # TNS stores amounts as a float dollar amount with two decimal
+        # places, but the rest of our code assumes that money is
+        # formatted as integer values. So the amount we get back from 
+        # TNS needs to be converted to an integer value
+        return (BigDecimal.new(transaction_amount.to_s) * 100).to_i if transaction_amount.present?
+      end
+
     end
 
   end

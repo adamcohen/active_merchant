@@ -6,7 +6,7 @@ class SagePayTest < Test::Unit::TestCase
       :login => 'X'
     )
 
-    @credit_card = credit_card('4242424242424242', :type => 'visa')
+    @credit_card = credit_card('4242424242424242', :brand => 'visa')
     @options = { 
       :billing_address => { 
         :name => 'Tekin Suleyman',
@@ -107,10 +107,10 @@ class SagePayTest < Test::Unit::TestCase
 
   def test_dont_send_fractional_amount_for_chinese_yen
     @amount = 100_00  # 100 YEN
-    @options[:currency] = 'YEN'
+    @options[:currency] = 'JPY'
 
     @gateway.expects(:add_pair).with({}, :Amount, '100', :required => true)
-    @gateway.expects(:add_pair).with({}, :Currency, 'YEN', :required => true)
+    @gateway.expects(:add_pair).with({}, :Currency, 'JPY', :required => true)
 
     @gateway.send(:add_amount, {}, @amount, @options)
   end
